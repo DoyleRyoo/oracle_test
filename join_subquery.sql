@@ -346,23 +346,120 @@ WHERE department_id = (
 SELECT e.first_name, j.job_title, e.hire_date
 FROM employees e, jobs j
 WHERE e.job_id = j.job_id
-AND j.job_id = (
-    SELECT job_id
-    FROM employees
-    WHERE first_name = 'Lex'
+    AND j.job_id = (
+        SELECT job_id
+        FROM employees
+        WHERE first_name = 'Lex'
+    );
+
+-- 'IT'에 근무하는 사원이름(first_name), 부서번호을 출력하시오. 
+SELECT first_name, department_id
+FROM employees
+WHERE department_id = (
+    SELECT department_id
+    FROM departments
+    WHERE department_name = 'IT'
 );
---'Lex'와 동일한 업무(job_id)를 가진 사원의 이름(first_name), 
- -- 업무명(job_title), 입사일(hire_date)을 출력하시오.  
-SELECT e.first_name, j.job_title, e.hire_date
-FROM employees e, jobs j
-WHERE  e.job_id = j.job_id 
-AND  j.job_id = (
-    SELECT job_id
+
+--Steven와 같은 부서에서 근무하는 사원의 이름, 급여, 입사일을 출력하시오.(in)
+SELECT first_name, salary, hire_date
+FROM employees
+WHERE department_id IN (
+    SELECT department_id
     FROM employees
-    WHERE first_name = 'Lex'
+    WHERE first_name = 'Steven'
+);
+
+--30소속된 사원들 중에서 급여를 가장 많이  받은 사원보다 더 많은 급여를 받는
+--사원이름, 급여, 입사일을 출력하시오. (ALL)
+--(서브쿼리에서 max()함수를 사용하지 않는다);
+SELECT first_name, salary, hire_date
+FROM employees
+WHERE salary >ALL (
+    SELECT salary
+    FROM employees
+    WHERE department_id = 30
+);
+
+-- max 사용 예시
+SELECT first_name, salary, hire_date
+FROM employees
+WHERE salary > (
+    SELECT max(salary)
+    FROM employees
+    WHERE department_id = 30
+);
+
+ --30소속된 사원들이 받은 급여보다  높은 급여를 받는 
+--사원이름, 급여, 입사일을 출력하시오. (ANY)
+--(서브쿼리에서 min()함수를 사용하지 않는다);
+SELECT first_name, salary, hire_date
+FROM employees
+WHERE salary >ANY (
+    SELECT salary
+    FROM employees
+    WHERE department_id = 30
+);
+
+/*-----------------------------------------------------
+ 상관관계 서브쿼리
+ : 서브쿼리에서 메인쿼리의 컬럼을 참조한다.(메인쿼리를 먼저수행한다.)
+   서브쿼리는 메인쿼리 각각의 행에 대해서 순서적으로 한번씩 실행한다.
+ <아래 쿼리 처리순서>
+ 1st : 바깥쪽 쿼리의 첫째 row에 대하여 
+ 2nd : 안쪽 쿼리에서 자신의 속해있는 부서의 MAX salary과
+       비교하여 true 이면 바깥의 컬럼값을 반환하고 , 
+       false 이면 값을 버린다. 
+ 3rd : 바깥쪽 쿼리의 두 번째 row에 대하여 마찬가지로 실행하며, 
+       이렇게 바깥쪽 쿼리의 마지막 row까지 실행한다. 
+	   
+https://www.w3resource.com/sql/subqueries/correlated-subqueries-using-aliases.php	   
+----------------------------------------------------*/
+
+--비상관관계 서브쿼리 : 서브쿼리에서 메인쿼리의 컬럼을 참조하지 않음
+SELECT department_id, department_name
+FROM departments
+WHERE department_id IN (
+    SELECT distinct department_id
+    FROM employees
+    WHERE department_id IS NOT NULL
 );
 
 
+--상관관계 서브쿼리 : 서브쿼리에서 메인쿼리의 컬럼을 참조함
+SELECT department_id, department_name
+FROM departments d  -- 여기서 선언한 것을
+WHERE EXISTS (
+    SELECT 1
+    FROM employees
+    WHERE department_id = d.department_id   -- 여기서 사용하는 것을 볼 수 있음
+);
 
+SELECT employee_id, first_name, manager_id
+FROM employees e
+WHERE EXISTS (
+    SELECT 1
+    FROM employees m
+    WHERE e.manager_id = m.employee_id
+);
 
+/*=========================================================
+Top-N 서브쿼리
+   상위의 값을 추출할때 사용된다.
+   <, <=연산자를 사용할수 있다. 단 비교되는 값이 1일때는 =도 가능하다.
+   order by절을 사용할 수 있다.
+=========================================================*/    
+--급여가 가장 높은 상위 3명을 검색하시오.
+SELECT rownum, emp.first_name, emp.salary
+FROM (SELECT first_name, salary /* inline view(인라인 뷰)FROM에 들어가는 것 */
+      FROM employees
+      ORDER BY salary DESC) emp
+WHERE rownum <= 3;
 
+--급여가 가장 높은 상위 4위부터 8위까지 검색하시오.
+SELECT trow.r, trow.first_name, trow.salary
+FROM (SELECT rownum as r, emp.first_name, emp.salary
+      FROM (SELECT first_name, salary
+            FROM employees
+            ORDER BY salary DESC) emp) trow
+WHERE trow.r >= 4 AND trow.r <= 8;
